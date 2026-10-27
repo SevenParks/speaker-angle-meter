@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <title>ホームシアター角度計</title>
 
 <style>
@@ -18,6 +17,19 @@ body{
 .value{
     font-size:3rem;
     margin:10px;
+    color:white;
+    transition:color 0.2s;
+}
+
+.ok{
+    color:#00ff55;
+}
+
+input{
+    font-size:1.2rem;
+    width:100px;
+    text-align:center;
+    margin:5px;
 }
 
 button{
@@ -33,10 +45,18 @@ button{
 <h1>ホームシアター角度計</h1>
 
 <button id="enableBtn">センサー有効化</button>
-
 <br>
-
 <button id="zeroBtn">正面を基準登録</button>
+
+<hr>
+
+<h3>目標トーイン角</h3>
+<input id="targetYaw" type="number" step="0.1" placeholder="24.0">
+
+<h3>目標ピッチ角</h3>
+<input id="targetPitch" type="number" step="0.1" placeholder="33.0">
+
+<hr>
 
 <h2>トーイン角</h2>
 <div id="yaw" class="value">0.0°</div>
@@ -50,6 +70,8 @@ button{
 <script>
 
 let yawOffset = 0;
+
+const tolerance = 0.5;
 
 async function enableSensors() {
 
@@ -76,6 +98,21 @@ function normalize(angle){
     while(angle < -180) angle += 360;
 
     return angle;
+}
+
+function setColor(element,value,target){
+
+    if(isNaN(target)){
+        element.classList.remove("ok");
+        return;
+    }
+
+    if(Math.abs(value-target)<=tolerance){
+        element.classList.add("ok");
+    }
+    else{
+        element.classList.remove("ok");
+    }
 }
 
 function updateOrientation(event){
@@ -108,6 +145,28 @@ function updateOrientation(event){
     document.getElementById("roll")
         .innerText =
         roll.toFixed(1) + "°";
+
+    const targetYaw =
+        parseFloat(
+            document.getElementById("targetYaw").value
+        );
+
+    const targetPitch =
+        parseFloat(
+            document.getElementById("targetPitch").value
+        );
+
+    setColor(
+        document.getElementById("yaw"),
+        relativeYaw,
+        targetYaw
+    );
+
+    setColor(
+        document.getElementById("pitch"),
+        pitch,
+        targetPitch
+    );
 }
 
 document.getElementById("enableBtn")
@@ -129,7 +188,6 @@ document.getElementById("zeroBtn")
             yawOffset =
                 yawOffset +
                 parseFloat(display);
-
         }
     );
 
