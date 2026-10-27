@@ -73,6 +73,7 @@ button{
 <script>
 
 let yawOffset = 0;
+let yawFiltered = 0;
 
 const tolerance = 0.5;
 
@@ -139,11 +140,16 @@ function updateOrientation(event){
     const roll = event.gamma;
 
     let relativeYaw =
-        normalize(yaw - yawOffset);
+    normalize(yaw - yawOffset);
+
+    // 平滑化（指数移動平均）
+    yawFiltered =
+        yawFiltered * 0.85 +
+        relativeYaw * 0.15;
 
     document.getElementById("yaw")
         .innerText =
-        relativeYaw.toFixed(1) + "°";
+    yawFiltered.toFixed(2) + "°";
 
     document.getElementById("pitch")
         .innerText =
@@ -165,7 +171,7 @@ function updateOrientation(event){
 
     setColor(
         document.getElementById("yaw"),
-        relativeYaw,
+        yawFiltered,
         targetYaw
     );
 
