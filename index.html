@@ -136,6 +136,26 @@ function updateOrientation(event){
         yaw = event.alpha;
     }
 
+
+// test
+document.getElementById("yawRaw")
+    .innerText =
+    yaw.toFixed(2) + "°";
+
+document.getElementById("alphaRaw")
+    .innerText =
+    (event.alpha ?? 0).toFixed(2) + "°";
+
+document.getElementById("compassRaw")
+    .innerText =
+    (compass ?? 0).toFixed(2) + "°";
+
+// end test
+
+
+
+
+    
     const pitch = event.beta;
     const roll = event.gamma;
 
