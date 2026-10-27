@@ -24,8 +24,15 @@ body{
 .ok{
     color:#00ff55;
 }
+
 .near{
     color:#ffd700;
+}
+
+.debug{
+    font-size:1.2rem;
+    color:#aaa;
+    margin-bottom:10px;
 }
 
 input{
@@ -62,7 +69,7 @@ button{
 <hr>
 
 <h2>トーイン角</h2>
-<div id="yaw" class="value">0.0°</div>
+<div id="yaw" class="value">0.00°</div>
 
 <h2>ピッチ角</h2>
 <div id="pitch" class="value">0.0°</div>
@@ -70,12 +77,46 @@ button{
 <h2>ロール角</h2>
 <div id="roll" class="value">0.0°</div>
 
+<hr>
+
+<h3>デバッグ（使用中の値）</h3>
+<div id="yawRaw" class="debug">0.00°</div>
+
+<h3>デバッグ（event.alpha）</h3>
+<div id="alphaRaw" class="debug">0.00°</div>
+
+<h3>デバッグ（webkitCompassHeading）</h3>
+<div id="compassRaw" class="debug">0.00°</div>
+
 <script>
 
 let yawOffset = 0;
 let yawFiltered = 0;
 
-const tolerance = 0.5;
+function normalize(angle){
+    while(angle > 180) angle -= 360;
+    while(angle < -180) angle += 360;
+    return angle;
+}
+
+function setColor(element,value,target){
+
+    element.classList.remove("ok");
+    element.classList.remove("near");
+
+    if(isNaN(target)){
+        return;
+    }
+
+    const error = Math.abs(value - target);
+
+    if(error <= 0.2){
+        element.classList.add("ok");
+    }
+    else if(error <= 0.5){
+        element.classList.add("near");
+    }
+}
 
 async function enableSensors() {
 
@@ -96,33 +137,6 @@ async function enableSensors() {
     );
 }
 
-function normalize(angle){
-
-    while(angle > 180) angle -= 360;
-    while(angle < -180) angle += 360;
-
-    return angle;
-}
-
-function setColor(element,value,target){
-
-    element.classList.remove("ok");
-    element.classList.remove("near");
-
-    if(isNaN(target)){
-        return;
-    }
-
-    const error = Math.abs(value-target);
-
-    if(error <= 0.2){
-        element.classList.add("ok");
-    }
-    else if(error <= 0.5){
-        element.classList.add("near");
-    }
-}
-
 function updateOrientation(event){
 
     const compass = event.webkitCompassHeading;
@@ -136,40 +150,25 @@ function updateOrientation(event){
         yaw = event.alpha;
     }
 
+    if(yaw == null){
+        return;
+    }
 
-// test
-document.getElementById("yawRaw")
-    .innerText =
-    yaw.toFixed(2) + "°";
-
-document.getElementById("alphaRaw")
-    .innerText =
-    (event.alpha ?? 0).toFixed(2) + "°";
-
-document.getElementById("compassRaw")
-    .innerText =
-    (compass ?? 0).toFixed(2) + "°";
-
-// end test
-
-
-
-
-    
-    const pitch = event.beta;
-    const roll = event.gamma;
+    const pitch = event.beta ?? 0;
+    const roll = event.gamma ?? 0;
 
     let relativeYaw =
-    normalize(yaw - yawOffset);
+        normalize(yaw - yawOffset);
 
-    // 平滑化（指数移動平均）
+    // 平滑化
     yawFiltered =
         yawFiltered * 0.85 +
         relativeYaw * 0.15;
 
+    // メイン表示
     document.getElementById("yaw")
         .innerText =
-    yawFiltered.toFixed(2) + "°";
+        yawFiltered.toFixed(2) + "°";
 
     document.getElementById("pitch")
         .innerText =
@@ -178,6 +177,19 @@ document.getElementById("compassRaw")
     document.getElementById("roll")
         .innerText =
         roll.toFixed(1) + "°";
+
+    // デバッグ表示
+    document.getElementById("yawRaw")
+        .innerText =
+        yaw.toFixed(2) + "°";
+
+    document.getElementById("alphaRaw")
+        .innerText =
+        (event.alpha ?? 0).toFixed(2) + "°";
+
+    document.getElementById("compassRaw")
+        .innerText =
+        (compass ?? 0).toFixed(2) + "°";
 
     const targetYaw =
         parseFloat(
@@ -213,14 +225,8 @@ document.getElementById("zeroBtn")
         "click",
         () => {
 
-            const display =
-                document
-                .getElementById("yaw")
-                .innerText;
+            yawOffset += yawFiltered;
 
-            yawOffset =
-                yawOffset +
-                parseFloat(display);
         }
     );
 
