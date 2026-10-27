@@ -102,16 +102,20 @@ function normalize(angle){
 
 function setColor(element,value,target){
 
+    element.classList.remove("ok");
+    element.classList.remove("near");
+
     if(isNaN(target)){
-        element.classList.remove("ok");
         return;
     }
 
-    if(Math.abs(value-target)<=tolerance){
+    const error = Math.abs(value-target);
+
+    if(error <= 0.2){
         element.classList.add("ok");
     }
-    else{
-        element.classList.remove("ok");
+    else if(error <= 0.5){
+        element.classList.add("near");
     }
 }
 
