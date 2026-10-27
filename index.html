@@ -101,18 +101,18 @@ let yawFiltered = 0;
 let alphaReference = null;
 
 /*
- * ±0.2°以内 → 緑
- * ±0.5°以内 → 黄
+ * ±0.3°以内 → 緑
+ * ±0.7°以内 → 黄
  */
-const GREEN_TOLERANCE = 0.2;
-const YELLOW_TOLERANCE = 0.5;
+const GREEN_TOLERANCE = 0.3;
+const YELLOW_TOLERANCE = 0.7;
 
 /*
- * 平滑化係数
+ * 平滑化係数 0.85
  * 大きいほど安定
  * 小さいほど追従性重視
  */
-const FILTER_FACTOR = 0.85;
+const FILTER_FACTOR = 0.25;
 
 /*
  * ドリフト補正用コンパス比率
