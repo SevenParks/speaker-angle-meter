@@ -69,7 +69,7 @@ button{
 <hr>
 
 <h2>トーイン角</h2>
-<div id="yaw" class="value">0.00°</div>
+<div id="yaw" class="value">0.0°</div>
 
 <h2>ピッチ角</h2>
 <div id="pitch" class="value">0.0°</div>
@@ -102,10 +102,10 @@ let alphaReference = null;
 
 /*
  * ±0.3°以内 → 緑
- * ±0.7°以内 → 黄
+ * ±0.9°以内 → 黄
  */
 const GREEN_TOLERANCE = 0.3;
-const YELLOW_TOLERANCE = 0.7;
+const YELLOW_TOLERANCE = 0.9;
 
 /*
  * 平滑化係数 0.85
