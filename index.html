@@ -77,8 +77,8 @@ button{
 <h2>ロール角</h2>
 <div id="roll" class="value">0.0°</div>
 
-<hr>
-
+<!--
+デバッグ用
 <h3>デバッグ（使用中の値）</h3>
 <div id="yawRaw" class="debug">0.00°</div>
 
@@ -87,15 +87,47 @@ button{
 
 <h3>デバッグ（webkitCompassHeading）</h3>
 <div id="compassRaw" class="debug">0.00°</div>
+-->
 
 <script>
 
+// ゼロ点補正値
 let yawOffset = 0;
+
+// 表示用フィルター後角度
 let yawFiltered = 0;
 
+// Alpha基準角度
+let alphaReference = null;
+
+/*
+ * ±0.2°以内 → 緑
+ * ±0.5°以内 → 黄
+ */
+const GREEN_TOLERANCE = 0.2;
+const YELLOW_TOLERANCE = 0.5;
+
+/*
+ * 平滑化係数
+ * 大きいほど安定
+ * 小さいほど追従性重視
+ */
+const FILTER_FACTOR = 0.85;
+
+/*
+ * ドリフト補正用コンパス比率
+ *
+ * 0.00 = Alphaのみ
+ * 0.02 = 2%だけCompass使用
+ * 0.05 = 5%だけCompass使用
+ */
+const COMPASS_BLEND = 0.02;
+
 function normalize(angle){
+
     while(angle > 180) angle -= 360;
     while(angle < -180) angle += 360;
+
     return angle;
 }
 
@@ -110,22 +142,22 @@ function setColor(element,value,target){
 
     const error = Math.abs(value - target);
 
-    if(error <= 0.2){
+    if(error <= GREEN_TOLERANCE){
         element.classList.add("ok");
     }
-    else if(error <= 0.5){
+    else if(error <= YELLOW_TOLERANCE){
         element.classList.add("near");
     }
 }
 
-async function enableSensors() {
+async function enableSensors(){
 
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    if(typeof DeviceOrientationEvent.requestPermission === 'function'){
 
         const result =
             await DeviceOrientationEvent.requestPermission();
 
-        if (result !== 'granted') {
+        if(result !== 'granted'){
             alert('許可されませんでした');
             return;
         }
@@ -139,33 +171,50 @@ async function enableSensors() {
 
 function updateOrientation(event){
 
+    const alpha = event.alpha;
     const compass = event.webkitCompassHeading;
 
-    let yaw;
-
-    if(compass !== undefined){
-        yaw = compass;
-    }
-    else{
-        yaw = event.alpha;
-    }
-
-    if(yaw == null){
+    if(alpha == null){
         return;
     }
 
     const pitch = event.beta ?? 0;
     const roll = event.gamma ?? 0;
 
+    if(alphaReference === null){
+        alphaReference = alpha;
+    }
+
+    /*
+     * event.alpha主体
+     */
+    let yaw =
+        normalize(alpha - alphaReference);
+
+    /*
+     * Compassを少量だけ混ぜる
+     * ドリフト抑制目的
+     */
+    if(compass !== undefined){
+
+        const compassRelative =
+            normalize(compass - alphaReference);
+
+        yaw =
+            yaw * (1 - COMPASS_BLEND) +
+            compassRelative * COMPASS_BLEND;
+    }
+
     let relativeYaw =
         normalize(yaw - yawOffset);
 
-    // 平滑化
+    /*
+     * 平滑化
+     */
     yawFiltered =
-        yawFiltered * 0.85 +
-        relativeYaw * 0.15;
+        yawFiltered * FILTER_FACTOR +
+        relativeYaw * (1 - FILTER_FACTOR);
 
-    // メイン表示
     document.getElementById("yaw")
         .innerText =
         yawFiltered.toFixed(2) + "°";
@@ -178,18 +227,21 @@ function updateOrientation(event){
         .innerText =
         roll.toFixed(1) + "°";
 
-    // デバッグ表示
+    /*
+    デバッグ用
+
     document.getElementById("yawRaw")
         .innerText =
         yaw.toFixed(2) + "°";
 
     document.getElementById("alphaRaw")
         .innerText =
-        (event.alpha ?? 0).toFixed(2) + "°";
+        alpha.toFixed(2) + "°";
 
     document.getElementById("compassRaw")
         .innerText =
         (compass ?? 0).toFixed(2) + "°";
+    */
 
     const targetYaw =
         parseFloat(
