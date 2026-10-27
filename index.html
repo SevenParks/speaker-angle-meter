@@ -1,21 +1,138 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>テスト</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>ホームシアター角度計</title>
+
+<style>
+body{
+    font-family:sans-serif;
+    text-align:center;
+    background:#111;
+    color:#fff;
+    margin:20px;
+}
+
+.value{
+    font-size:3rem;
+    margin:10px;
+}
+
+button{
+    font-size:1.2rem;
+    padding:10px 20px;
+    margin:10px;
+}
+</style>
 </head>
+
 <body>
 
-<h1>角度計テスト</h1>
+<h1>ホームシアター角度計</h1>
 
-<button onclick="test()">テスト</button>
+<button id="enableBtn">センサー有効化</button>
 
-<div id="result">0</div>
+<br>
+
+<button id="zeroBtn">正面を基準登録</button>
+
+<h2>トーイン角</h2>
+<div id="yaw" class="value">0.0°</div>
+
+<h2>ピッチ角</h2>
+<div id="pitch" class="value">0.0°</div>
+
+<h2>ロール角</h2>
+<div id="roll" class="value">0.0°</div>
 
 <script>
-function test() {
-    document.getElementById("result").innerText = "動作OK";
+
+let yawOffset = 0;
+
+async function enableSensors() {
+
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+
+        const result =
+            await DeviceOrientationEvent.requestPermission();
+
+        if (result !== 'granted') {
+            alert('許可されませんでした');
+            return;
+        }
+    }
+
+    window.addEventListener(
+        'deviceorientation',
+        updateOrientation
+    );
 }
+
+function normalize(angle){
+
+    while(angle > 180) angle -= 360;
+    while(angle < -180) angle += 360;
+
+    return angle;
+}
+
+function updateOrientation(event){
+
+    const compass = event.webkitCompassHeading;
+
+    let yaw;
+
+    if(compass !== undefined){
+        yaw = compass;
+    }
+    else{
+        yaw = event.alpha;
+    }
+
+    const pitch = event.beta;
+    const roll = event.gamma;
+
+    let relativeYaw =
+        normalize(yaw - yawOffset);
+
+    document.getElementById("yaw")
+        .innerText =
+        relativeYaw.toFixed(1) + "°";
+
+    document.getElementById("pitch")
+        .innerText =
+        pitch.toFixed(1) + "°";
+
+    document.getElementById("roll")
+        .innerText =
+        roll.toFixed(1) + "°";
+}
+
+document.getElementById("enableBtn")
+    .addEventListener(
+        "click",
+        enableSensors
+    );
+
+document.getElementById("zeroBtn")
+    .addEventListener(
+        "click",
+        () => {
+
+            const display =
+                document
+                .getElementById("yaw")
+                .innerText;
+
+            yawOffset =
+                yawOffset +
+                parseFloat(display);
+
+        }
+    );
+
 </script>
 
 </body>
