@@ -80,7 +80,7 @@ button{
 <hr>
 
 <h2>トーイン角</h2>
-<div id="yaw" class="value">0.00°</div>
+<div id="yaw" class="value">0.0°</div>
 
 <h2>ピッチ角</h2>
 <div id="pitch" class="value">0.0°</div>
@@ -111,10 +111,10 @@ compass : <span id="compassRaw">0</span>
 <script>
 
 /* 緑判定 */
-const GREEN_TOLERANCE = 0.2;
+const GREEN_TOLERANCE = 0.5;
 
 /* 黄判定 */
-const YELLOW_TOLERANCE = 0.5;
+const YELLOW_TOLERANCE = 1.0;
 
 /* 平滑化係数 */
 const FILTER_FACTOR = 0.85;
@@ -126,8 +126,8 @@ const FILTER_FACTOR = 0.85;
 */
 const YAW_SCALE = 1.02857;
 
-/* Fusion時のCompass混合率 */
-const COMPASS_BLEND = 0.02;
+/* Fusion時のCompass混合率 0.02 */
+const COMPASS_BLEND = 0.5;
 
 let yawOffset = 0;
 let yawFiltered = 0;
@@ -292,7 +292,7 @@ function updateOrientation(event){
     document
         .getElementById("yaw")
         .innerText =
-        yawFiltered.toFixed(2)+"°";
+        yawFiltered.toFixed(1)+"°";
 
     document
         .getElementById("pitch")
