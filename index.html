@@ -18,7 +18,7 @@ body{
     font-size:3rem;
     margin:10px;
     color:white;
-    transition:color 0.2s;
+    transition:color .2s;
 }
 
 .ok{
@@ -30,20 +30,20 @@ body{
 }
 
 .debug{
-    font-size:1.2rem;
     color:#aaa;
-    margin-bottom:10px;
+    font-size:1rem;
+    margin:4px;
 }
 
-input{
-    font-size:1.2rem;
-    width:100px;
+input,select{
+    font-size:1.1rem;
+    width:140px;
     text-align:center;
     margin:5px;
 }
 
 button{
-    font-size:1.2rem;
+    font-size:1.1rem;
     padding:10px 20px;
     margin:10px;
 }
@@ -60,16 +60,27 @@ button{
 
 <hr>
 
+<h3>トーイン計測方式</h3>
+
+<select id="yawMode">
+    <option value="alpha">Alpha</option>
+    <option value="scaled" selected>Alpha+補正</option>
+    <option value="fusion">Fusion</option>
+    <option value="compass">Compass</option>
+</select>
+
+<hr>
+
 <h3>目標トーイン角</h3>
-<input id="targetYaw" type="number" step="0.1" placeholder="24.0">
+<input id="targetYaw" type="number" step="0.1" placeholder="24">
 
 <h3>目標ピッチ角</h3>
-<input id="targetPitch" type="number" step="0.1" placeholder="33.0">
+<input id="targetPitch" type="number" step="0.1" placeholder="33">
 
 <hr>
 
 <h2>トーイン角</h2>
-<div id="yaw" class="value">0.0°</div>
+<div id="yaw" class="value">0.00°</div>
 
 <h2>ピッチ角</h2>
 <div id="pitch" class="value">0.0°</div>
@@ -77,50 +88,51 @@ button{
 <h2>ロール角</h2>
 <div id="roll" class="value">0.0°</div>
 
+<hr>
 
-<h3>デバッグ（使用中の値）</h3>
-<div id="yawRaw" class="debug">0.00°</div>
+<h3>デバッグ</h3>
 
-<h3>デバッグ（event.alpha）</h3>
-<div id="alphaRaw" class="debug">0.00°</div>
+<div class="debug">
+選択方式 : <span id="modeDebug"></span>
+</div>
 
-<h3>デバッグ（webkitCompassHeading）</h3>
-<div id="compassRaw" class="debug">0.00°</div>
+<div class="debug">
+alpha : <span id="alphaRaw">0</span>
+</div>
 
+<div class="debug">
+compass : <span id="compassRaw">0</span>
+</div>
+
+<div class="debug">
+内部Yaw : <span id="yawRaw">0</span>
+</div>
 
 <script>
 
-// ゼロ点補正値
-let yawOffset = 0;
+/* 緑判定 */
+const GREEN_TOLERANCE = 0.2;
 
-// 表示用フィルター後角度
-let yawFiltered = 0;
+/* 黄判定 */
+const YELLOW_TOLERANCE = 0.5;
 
-// Alpha基準角度
-let alphaReference = null;
-
-/*
- * ±0.3°以内 → 緑
- * ±0.9°以内 → 黄
- */
-const GREEN_TOLERANCE = 0.3;
-const YELLOW_TOLERANCE = 0.9;
+/* 平滑化係数 */
+const FILTER_FACTOR = 0.85;
 
 /*
- * 平滑化係数 0.85
- * 大きいほど安定
- * 小さいほど追従性重視
- */
-const FILTER_FACTOR = 0.25;
+90°回転で87.5°だった場合
 
-/*
- * ドリフト補正用コンパス比率
- *
- * 0.00 = Alphaのみ
- * 0.02 = 2%だけCompass使用
- * 0.05 = 5%だけCompass使用
- */
+90 / 87.5 = 1.02857
+*/
+const YAW_SCALE = 1.02857;
+
+/* Fusion時のCompass混合率 */
 const COMPASS_BLEND = 0.02;
+
+let yawOffset = 0;
+let yawFiltered = 0;
+let alphaReference = null;
+let compassReference = null;
 
 function normalize(angle){
 
@@ -135,28 +147,35 @@ function setColor(element,value,target){
     element.classList.remove("ok");
     element.classList.remove("near");
 
-    if(isNaN(target)){
-        return;
-    }
+    if(isNaN(target)) return;
 
-    const error = Math.abs(value - target);
+    const error =
+        Math.abs(value-target);
 
     if(error <= GREEN_TOLERANCE){
+
         element.classList.add("ok");
-    }
-    else if(error <= YELLOW_TOLERANCE){
+
+    }else if(error <= YELLOW_TOLERANCE){
+
         element.classList.add("near");
     }
 }
 
 async function enableSensors(){
 
-    if(typeof DeviceOrientationEvent.requestPermission === 'function'){
+    if(
+        typeof DeviceOrientationEvent
+        .requestPermission ===
+        'function'
+    ){
 
         const result =
-            await DeviceOrientationEvent.requestPermission();
+        await DeviceOrientationEvent
+        .requestPermission();
 
         if(result !== 'granted'){
+
             alert('許可されませんでした');
             return;
         }
@@ -173,82 +192,150 @@ function updateOrientation(event){
     const alpha = event.alpha;
     const compass = event.webkitCompassHeading;
 
-    if(alpha == null){
-        return;
-    }
-
-    const pitch = event.beta ?? 0;
-    const roll = event.gamma ?? 0;
+    if(alpha == null) return;
 
     if(alphaReference === null){
+
         alphaReference = alpha;
     }
 
-    /*
-     * event.alpha主体
-     */
-    let yaw =
-        normalize(alpha - alphaReference);
+    if(
+        compassReference === null &&
+        compass !== undefined
+    ){
 
-    /*
-     * Compassを少量だけ混ぜる
-     * ドリフト抑制目的
-     */
-    if(compass !== undefined){
-
-        const compassRelative =
-            normalize(compass - alphaReference);
-
-        yaw =
-            yaw * (1 - COMPASS_BLEND) +
-            compassRelative * COMPASS_BLEND;
+        compassReference = compass;
     }
 
-    let relativeYaw =
-        normalize(yaw - yawOffset);
+    const pitch =
+        event.beta ?? 0;
 
-    /*
-     * 平滑化
-     */
+    const roll =
+        event.gamma ?? 0;
+
+    const mode =
+        document
+        .getElementById("yawMode")
+        .value;
+
+    const alphaRelative =
+        normalize(
+            alpha -
+            alphaReference
+        );
+
+    let compassRelative = 0;
+
+    if(
+        compass !== undefined &&
+        compassReference !== null
+    ){
+
+        compassRelative =
+            normalize(
+                compass -
+                compassReference
+            );
+    }
+
+    let yaw = alphaRelative;
+
+    switch(mode){
+
+        case "alpha":
+
+            yaw =
+                alphaRelative;
+
+            break;
+
+        case "scaled":
+
+            yaw =
+                alphaRelative *
+                YAW_SCALE;
+
+            break;
+
+        case "compass":
+
+            yaw =
+                compassRelative;
+
+            break;
+
+        case "fusion":
+
+            yaw =
+                alphaRelative *
+                (1-COMPASS_BLEND)
+                +
+                compassRelative *
+                COMPASS_BLEND;
+
+            break;
+    }
+
+    yaw =
+        normalize(
+            yaw -
+            yawOffset
+        );
+
     yawFiltered =
-        yawFiltered * FILTER_FACTOR +
-        relativeYaw * (1 - FILTER_FACTOR);
+        yawFiltered *
+        FILTER_FACTOR
+        +
+        yaw *
+        (1-FILTER_FACTOR);
 
-    document.getElementById("yaw")
+    document
+        .getElementById("yaw")
         .innerText =
-        yawFiltered.toFixed(2) + "°";
+        yawFiltered.toFixed(2)+"°";
 
-    document.getElementById("pitch")
+    document
+        .getElementById("pitch")
         .innerText =
-        pitch.toFixed(1) + "°";
+        pitch.toFixed(1)+"°";
 
-    document.getElementById("roll")
+    document
+        .getElementById("roll")
         .innerText =
-        roll.toFixed(1) + "°";
+        roll.toFixed(1)+"°";
 
-
-
-    document.getElementById("yawRaw")
+    document
+        .getElementById("modeDebug")
         .innerText =
-        yaw.toFixed(2) + "°";
+        mode;
 
-    document.getElementById("alphaRaw")
+    document
+        .getElementById("alphaRaw")
         .innerText =
-        alpha.toFixed(2) + "°";
+        alphaRelative.toFixed(2);
 
-    document.getElementById("compassRaw")
+    document
+        .getElementById("compassRaw")
         .innerText =
-        (compass ?? 0).toFixed(2) + "°";
+        compassRelative.toFixed(2);
 
+    document
+        .getElementById("yawRaw")
+        .innerText =
+        yaw.toFixed(2);
 
     const targetYaw =
         parseFloat(
-            document.getElementById("targetYaw").value
+            document
+            .getElementById("targetYaw")
+            .value
         );
 
     const targetPitch =
         parseFloat(
-            document.getElementById("targetPitch").value
+            document
+            .getElementById("targetPitch")
+            .value
         );
 
     setColor(
@@ -264,21 +351,23 @@ function updateOrientation(event){
     );
 }
 
-document.getElementById("enableBtn")
-    .addEventListener(
-        "click",
-        enableSensors
-    );
+document
+.getElementById("enableBtn")
+.addEventListener(
+    "click",
+    enableSensors
+);
 
-document.getElementById("zeroBtn")
-    .addEventListener(
-        "click",
-        () => {
+document
+.getElementById("zeroBtn")
+.addEventListener(
+    "click",
+    ()=>{
 
-            yawOffset += yawFiltered;
-
-        }
-    );
+        yawOffset +=
+            yawFiltered;
+    }
+);
 
 </script>
 
